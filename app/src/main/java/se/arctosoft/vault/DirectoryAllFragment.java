@@ -47,7 +47,7 @@ public class DirectoryAllFragment extends DirectoryBaseFragment {
                     galleryGridAdapter.onSelectionModeChanged(false);
                 } else if (!navController.popBackStack()) {
                     FragmentActivity activity = requireActivity();
-                    Password.lock(activity);
+                    Password.lock(activity, false);
                     activity.finish();
                     if (!settings.exitOnLock()) {
                         startActivity(new Intent(context, MainActivity.class));

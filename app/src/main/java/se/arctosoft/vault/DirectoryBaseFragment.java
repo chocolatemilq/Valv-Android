@@ -119,7 +119,7 @@ public abstract class DirectoryBaseFragment extends Fragment implements MenuProv
         savedStateHandle.getLiveData(PasswordFragment.LOGIN_SUCCESSFUL).observe(navBackStackEntry, o -> {
             Boolean success = (Boolean) o;
             if (!success) {
-                Password.lock(getContext());
+                Password.lock(getContext(), false);
                 FragmentActivity activity = getActivity();
                 if (activity != null) {
                     activity.finish();
@@ -149,7 +149,7 @@ public abstract class DirectoryBaseFragment extends Fragment implements MenuProv
         navController = NavHostFragment.findNavController(this);
         Log.e(TAG, "onViewCreated: locked? " + passwordViewModel.isLocked());
         if (passwordViewModel.isLocked()) {
-            Password.lock(requireActivity());
+            Password.lock(requireActivity(), false);
             navController.navigate(R.id.password);
         } else {
             init();
@@ -538,7 +538,7 @@ public abstract class DirectoryBaseFragment extends Fragment implements MenuProv
             navController.navigate(R.id.action_directory_to_settings);
             return true;
         } else if (id == R.id.lock) {
-            Password.lock(getContext());
+            Password.lock(getContext(), galleryViewModel.isEmptyRootDir());
             FragmentActivity activity = getActivity();
             if (activity != null) {
                 activity.finish();

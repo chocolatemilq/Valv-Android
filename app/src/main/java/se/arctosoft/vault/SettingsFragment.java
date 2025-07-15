@@ -109,7 +109,7 @@ public class SettingsFragment extends PreferenceFragmentCompat implements MenuPr
             public void handleOnBackPressed() {
                 if (!navController.popBackStack()) {
                     FragmentActivity activity = requireActivity();
-                    Password.lock(activity);
+                    Password.lock(activity, false);
                     activity.finish();
                 }
             }

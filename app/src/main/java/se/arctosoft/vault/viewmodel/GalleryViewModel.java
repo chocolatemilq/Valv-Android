@@ -178,4 +178,8 @@ public class GalleryViewModel extends ViewModel {
     public boolean isAllFolder() {
         return isAllFolder;
     }
+
+    public boolean isEmptyRootDir() {
+        return initialised && isRootDir && (galleryFiles.isEmpty() || (galleryFiles.size() == 1 && galleryFiles.get(0).isAllFolder()));
+    }
 }

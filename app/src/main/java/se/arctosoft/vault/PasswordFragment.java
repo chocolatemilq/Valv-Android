@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 
+import se.arctosoft.vault.data.DirHash;
 import se.arctosoft.vault.databinding.FragmentPasswordBinding;
 import se.arctosoft.vault.encryption.Encryption;
 import se.arctosoft.vault.utils.Dialogs;
@@ -78,15 +79,15 @@ public class PasswordFragment extends Fragment {
 
             new Thread(() -> {
                 Settings settings = Settings.getInstance(requireContext());
-                byte[] dirHash = settings.getDirHashForKey(temp);
+                DirHash dirHash = settings.getDirHashForKey(temp);
                 if (dirHash == null) {
                     Log.e(TAG, "init: dirHash null, save new");
                     byte[] salt = Encryption.generateSecureSalt(Encryption.SALT_LENGTH);
                     dirHash = Encryption.getDirHash(salt, temp);
-                    settings.saveKeyEntry(salt, dirHash);
+                    settings.createDirHashEntry(salt, dirHash.hash());
                 }
 
-                byte[] finalDirHash = dirHash;
+                DirHash finalDirHash = dirHash;
                 requireActivity().runOnUiThread(() -> {
                     passwordViewModel.setDirHash(finalDirHash);
                     binding.eTPassword.setText(null);

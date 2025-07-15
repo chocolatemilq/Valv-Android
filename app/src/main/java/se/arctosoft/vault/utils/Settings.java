@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import se.arctosoft.vault.data.DirHash;
 import se.arctosoft.vault.data.Password;
 import se.arctosoft.vault.data.StoredDirectory;
 import se.arctosoft.vault.encryption.Encryption;
@@ -211,10 +212,10 @@ public class Settings {
     }
 
     private String getDirsKey() {
-        return PREF_VAULT_PREFIX + new String(Password.getInstance().getDirHash(), StandardCharsets.UTF_8);
+        return PREF_VAULT_PREFIX + new String(Password.getInstance().getDirHash().hash(), StandardCharsets.UTF_8);
     }
 
-    public byte[] getDirHashForKey(char[] password) {
+    public DirHash getDirHashForKey(char[] password) {
         String keys = getSharedPrefs().getString(PREF_VAULT_KEYS, "");
         byte[] bytes = keys.getBytes(StandardCharsets.ISO_8859_1);
 
@@ -224,22 +225,53 @@ public class Settings {
         while (startPos + entryLength <= bytes.length) { // for each entry, check if the current password can produce the same hash
             byte[] salt = Arrays.copyOfRange(bytes, startPos, startPos + Encryption.SALT_LENGTH); // 16 bytes
             byte[] hash = Arrays.copyOfRange(bytes, startPos + Encryption.SALT_LENGTH, startPos + Encryption.SALT_LENGTH + Encryption.DIR_HASH_LENGTH); // following 8 bytes
-            byte[] dirHash = Encryption.getDirHash(salt, password);
+            DirHash dirHash = Encryption.getDirHash(salt, password);
 
-            if (Arrays.equals(dirHash, hash)) {
-                return dirHash;
+            if (Arrays.equals(dirHash.hash(), hash)) {
+                return new DirHash(salt, dirHash.hash());
             }
             startPos += entryLength;
         }
         return null;
     }
 
-    public void saveKeyEntry(byte[] salt, byte[] hash) {
+    public void createDirHashEntry(byte[] salt, byte[] hash) {
         String keys = getSharedPrefs().getString(PREF_VAULT_KEYS, "");
         String newKeys = new String(Bytes.concat(keys.getBytes(StandardCharsets.ISO_8859_1), salt, hash), StandardCharsets.ISO_8859_1);
         getSharedPrefsEditor()
                 .putString(PREF_VAULT_KEYS, newKeys)
                 .apply();
+    }
+
+    public void deleteDirHashEntry(byte[] salt, byte[] hash) {
+        if (salt == null || hash == null) {
+            return;
+        }
+
+        byte[] bytesToRemove = Bytes.concat(salt, hash);
+        byte[] storedBytes = getSharedPrefs().getString(PREF_VAULT_KEYS, "").getBytes(StandardCharsets.ISO_8859_1);
+
+        if (storedBytes.length < bytesToRemove.length) {
+            return;
+        }
+
+        final int entryLength = Encryption.SALT_LENGTH + Encryption.DIR_HASH_LENGTH;
+
+        for (int i = 0; i + entryLength <= storedBytes.length; i += entryLength) {
+            byte[] bytesToCheck = Arrays.copyOfRange(storedBytes, i, i + entryLength);
+            if (Arrays.equals(bytesToRemove, bytesToCheck)) {
+                byte[] before = i == 0 ? new byte[0] : Arrays.copyOfRange(storedBytes, 0, i);
+                byte[] after = i + entryLength > storedBytes.length ? new byte[0] : Arrays.copyOfRange(storedBytes, i + entryLength, storedBytes.length);
+
+                String newKeys = new String(Bytes.concat(before, after), StandardCharsets.ISO_8859_1);
+                getSharedPrefsEditor()
+                        .putString(PREF_VAULT_KEYS, newKeys)
+                        .remove(PREF_VAULT_PREFIX + new String(hash, StandardCharsets.UTF_8))
+                        .apply();
+
+                break;
+            }
+        }
     }
 
     public void setShowFilenames(boolean show) {

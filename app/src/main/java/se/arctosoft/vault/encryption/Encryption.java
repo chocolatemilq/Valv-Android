@@ -65,6 +65,7 @@ import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.security.auth.DestroyFailedException;
 
+import se.arctosoft.vault.data.DirHash;
 import se.arctosoft.vault.data.FileType;
 import se.arctosoft.vault.data.GalleryFile;
 import se.arctosoft.vault.exception.InvalidPasswordException;
@@ -669,14 +670,14 @@ public class Encryption {
         }
     }
 
-    public static byte[] getDirHash(byte[] salt, char[] password) {
+    public static DirHash getDirHash(byte[] salt, char[] password) {
         try {
             SecretKeyFactory secretKeyFactory = SecretKeyFactory.getInstance(KEY_ALGORITHM);
             KeySpec keySpec = new PBEKeySpec(password, salt, 120_000, KEY_LENGTH + 8);
             SecretKey secretKey = secretKeyFactory.generateSecret(keySpec);
 
             byte[] encoded = secretKey.getEncoded();
-            byte[] bytes = Arrays.copyOfRange(encoded, encoded.length - 8, encoded.length); // get last 8 bytes
+            byte[] hash = Arrays.copyOfRange(encoded, encoded.length - 8, encoded.length); // get last 8 bytes
 
             try {
                 secretKey.destroy();
@@ -685,7 +686,7 @@ public class Encryption {
             }
             Arrays.fill(encoded, (byte) 0);
 
-            return bytes;
+            return new DirHash(salt, hash);
         } catch (Exception e) {
             e.printStackTrace();
             return null;
