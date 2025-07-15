@@ -237,7 +237,6 @@ public class Settings {
     public void saveKeyEntry(byte[] salt, byte[] hash) {
         String keys = getSharedPrefs().getString(PREF_VAULT_KEYS, "");
         String newKeys = new String(Bytes.concat(keys.getBytes(StandardCharsets.ISO_8859_1), salt, hash), StandardCharsets.ISO_8859_1);
-        //Log.e(TAG, "saveKeyEntry:\n" + Arrays.toString(keys.getBytes(StandardCharsets.ISO_8859_1)) + "\n" + Arrays.toString(Bytes.concat(salt, hash)) + "\n");
         getSharedPrefsEditor()
                 .putString(PREF_VAULT_KEYS, newKeys)
                 .apply();

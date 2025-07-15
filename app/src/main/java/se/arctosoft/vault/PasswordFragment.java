@@ -71,6 +71,7 @@ public class PasswordFragment extends Fragment {
         binding.btnUnlock.setOnClickListener(v -> {
             binding.btnUnlock.setEnabled(false);
             binding.eTPassword.setEnabled(false);
+            binding.loading.setVisibility(View.VISIBLE);
             char[] temp = new char[binding.eTPassword.length()];
             binding.eTPassword.getText().getChars(0, binding.eTPassword.length(), temp, 0);
             passwordViewModel.setPassword(temp);
