@@ -2,6 +2,7 @@ package se.arctosoft.vault.viewmodel;
 
 import androidx.lifecycle.ViewModel;
 
+import se.arctosoft.vault.data.DirHash;
 import se.arctosoft.vault.data.Password;
 
 public class PasswordViewModel extends ViewModel {
@@ -30,11 +31,9 @@ public class PasswordViewModel extends ViewModel {
         return password.getPassword();
     }
 
-    public void clearPassword() {
-        if (password != null) {
-            password.clearPassword();
-            password = null;
-        }
+    public void setDirHash(DirHash dirHash) {
+        initPassword();
+        this.password.setDirHash(dirHash);
     }
 
 }

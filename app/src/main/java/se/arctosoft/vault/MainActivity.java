@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         Log.d(TAG, "onDestroy: " + isChangingConfigurations());
         if (!isChangingConfigurations()) {
-            Password.lock(this);
+            Password.lock(this, false);
         }
         super.onDestroy();
     }

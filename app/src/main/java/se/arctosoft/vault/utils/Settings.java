@@ -26,17 +26,25 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.google.common.primitives.Bytes;
+
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import se.arctosoft.vault.data.DirHash;
+import se.arctosoft.vault.data.Password;
 import se.arctosoft.vault.data.StoredDirectory;
+import se.arctosoft.vault.encryption.Encryption;
 import se.arctosoft.vault.interfaces.IOnDirectoryAdded;
 
 public class Settings {
     private static final String TAG = "Settings";
     private static final String SHARED_PREFERENCES_NAME = "prefs";
-    private static final String PREF_DIRECTORIES = "p.gallery.dirs";
+    private static final String PREF_VAULT_PREFIX = "dirs_";
+    private static final String PREF_VAULT_KEYS = "keys";
     private static final String PREF_SHOW_FILENAMES_IN_GRID = "p.gallery.fn";
     public static final String PREF_ENCRYPTION_ITERATION_COUNT = "encryption_iteration_count";
     public static final String PREF_ENCRYPTION_USE_DISK_CACHE = "encryption_use_disk_cache";
@@ -45,6 +53,8 @@ public class Settings {
     public static final String PREF_APP_SECURE = "app_secure";
     public static final String PREF_APP_EDIT_FOLDERS = "app_edit_folders";
     public static final String PREF_APP_EXIT_ON_LOCK = "app_exit_on_lock";
+    public static final String PREF_APP_BIOMETRICS = "app_biometrics";
+    public static final String PREF_APP_BIOMETRICS_DATA = "app_biometrics_data";
 
     private final Context context;
     private static Settings settings;
@@ -88,6 +98,33 @@ public class Settings {
         return getSharedPrefs().getBoolean(PREF_ENCRYPTION_DELETE_BY_DEFAULT, false);
     }
 
+    public boolean isBiometricsEnabled() {
+        return getSharedPrefs().getString(PREF_APP_BIOMETRICS, null) != null;
+    }
+
+    public void setBiometricsEnabled(byte[] iv, byte[] data) {
+        getSharedPrefsEditor()
+                .putString(PREF_APP_BIOMETRICS, iv == null ? null : new String(iv, StandardCharsets.ISO_8859_1))
+                .putString(PREF_APP_BIOMETRICS_DATA, data == null ? null : new String(data, StandardCharsets.ISO_8859_1))
+                .apply();
+    }
+
+    public byte[] getBiometricsIv() {
+        String s = getSharedPrefs().getString(PREF_APP_BIOMETRICS, null);
+        if (s == null) {
+            return null;
+        }
+        return s.getBytes(StandardCharsets.ISO_8859_1);
+    }
+
+    public byte[] getBiometricsData() {
+        String s = getSharedPrefs().getString(PREF_APP_BIOMETRICS_DATA, null);
+        if (s == null) {
+            return null;
+        }
+        return s.getBytes(StandardCharsets.ISO_8859_1);
+    }
+
     public void setDeleteByDefault(boolean deleteByDefault) {
         getSharedPrefsEditor().putBoolean(PREF_ENCRYPTION_DELETE_BY_DEFAULT, deleteByDefault).apply();
     }
@@ -129,7 +166,7 @@ public class Settings {
         } else {
             directories.add(0, newDir);
         }
-        getSharedPrefsEditor().putString(PREF_DIRECTORIES, stringListAsString(directories)).apply();
+        getSharedPrefsEditor().putString(getDirsKey(), stringListAsString(directories)).apply();
         if (onDirectoryAdded != null) {
             if (reordered) {
                 onDirectoryAdded.onAlreadyExists();
@@ -146,7 +183,7 @@ public class Settings {
         String[] split = uri.toString().split("/document/");
         directories.remove(new StoredDirectory(split[0], false));
         directories.remove(new StoredDirectory(uri, false));
-        getSharedPrefsEditor().putString(PREF_DIRECTORIES, stringListAsString(directories)).apply();
+        getSharedPrefsEditor().putString(getDirsKey(), stringListAsString(directories)).apply();
     }
 
     public void removeGalleryDirectories(@NonNull List<Uri> uris) {
@@ -154,7 +191,7 @@ public class Settings {
         for (Uri u : uris) {
             directories.remove(new StoredDirectory(u, false));
         }
-        getSharedPrefsEditor().putString(PREF_DIRECTORIES, stringListAsString(directories)).apply();
+        getSharedPrefsEditor().putString(getDirsKey(), stringListAsString(directories)).apply();
     }
 
     @NonNull
@@ -187,7 +224,7 @@ public class Settings {
 
     @NonNull
     private List<StoredDirectory> getGalleryDirectories(boolean rootDirsOnly) {
-        String s = getSharedPrefs().getString(PREF_DIRECTORIES, null);
+        String s = getSharedPrefs().getString(getDirsKey(), null);
         List<StoredDirectory> storedDirectories = new ArrayList<>();
         if (s != null && !s.isEmpty()) {
             String[] split = s.split("\n");
@@ -201,6 +238,69 @@ public class Settings {
             }
         }
         return storedDirectories;
+    }
+
+    private String getDirsKey() {
+        return PREF_VAULT_PREFIX + new String(Password.getInstance().getDirHash().hash(), StandardCharsets.UTF_8);
+    }
+
+    public DirHash getDirHashForKey(char[] password) {
+        String keys = getSharedPrefs().getString(PREF_VAULT_KEYS, "");
+        byte[] bytes = keys.getBytes(StandardCharsets.ISO_8859_1);
+
+        final int entryLength = Encryption.SALT_LENGTH + Encryption.DIR_HASH_LENGTH; // 16 + 8
+
+        int startPos = 0;
+        while (startPos + entryLength <= bytes.length) { // for each entry, check if the current password can produce the same hash
+            byte[] salt = Arrays.copyOfRange(bytes, startPos, startPos + Encryption.SALT_LENGTH); // 16 bytes
+            byte[] hash = Arrays.copyOfRange(bytes, startPos + Encryption.SALT_LENGTH, startPos + Encryption.SALT_LENGTH + Encryption.DIR_HASH_LENGTH); // following 8 bytes
+            DirHash dirHash = Encryption.getDirHash(salt, password);
+
+            if (Arrays.equals(dirHash.hash(), hash)) {
+                return new DirHash(salt, dirHash.hash());
+            }
+            startPos += entryLength;
+        }
+        return null;
+    }
+
+    public void createDirHashEntry(byte[] salt, byte[] hash) {
+        String keys = getSharedPrefs().getString(PREF_VAULT_KEYS, "");
+        String newKeys = new String(Bytes.concat(keys.getBytes(StandardCharsets.ISO_8859_1), salt, hash), StandardCharsets.ISO_8859_1);
+        getSharedPrefsEditor()
+                .putString(PREF_VAULT_KEYS, newKeys)
+                .apply();
+    }
+
+    public void deleteDirHashEntry(byte[] salt, byte[] hash) {
+        if (salt == null || hash == null) {
+            return;
+        }
+
+        byte[] bytesToRemove = Bytes.concat(salt, hash);
+        byte[] storedBytes = getSharedPrefs().getString(PREF_VAULT_KEYS, "").getBytes(StandardCharsets.ISO_8859_1);
+
+        if (storedBytes.length < bytesToRemove.length) {
+            return;
+        }
+
+        final int entryLength = Encryption.SALT_LENGTH + Encryption.DIR_HASH_LENGTH;
+
+        for (int i = 0; i + entryLength <= storedBytes.length; i += entryLength) {
+            byte[] bytesToCheck = Arrays.copyOfRange(storedBytes, i, i + entryLength);
+            if (Arrays.equals(bytesToRemove, bytesToCheck)) {
+                byte[] before = i == 0 ? new byte[0] : Arrays.copyOfRange(storedBytes, 0, i);
+                byte[] after = i + entryLength > storedBytes.length ? new byte[0] : Arrays.copyOfRange(storedBytes, i + entryLength, storedBytes.length);
+
+                String newKeys = new String(Bytes.concat(before, after), StandardCharsets.ISO_8859_1);
+                getSharedPrefsEditor()
+                        .putString(PREF_VAULT_KEYS, newKeys)
+                        .remove(PREF_VAULT_PREFIX + new String(hash, StandardCharsets.UTF_8))
+                        .apply();
+
+                break;
+            }
+        }
     }
 
     public void setShowFilenames(boolean show) {

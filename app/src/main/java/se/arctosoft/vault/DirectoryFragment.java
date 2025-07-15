@@ -85,7 +85,7 @@ public class DirectoryFragment extends DirectoryBaseFragment {
                     snackBarBackPressed.show();
                 } else if (!navController.popBackStack()) {
                     FragmentActivity activity = requireActivity();
-                    Password.lock(activity);
+                    Password.lock(activity, galleryViewModel.isEmptyRootDir());
                     activity.finish();
                     if (!settings.exitOnLock()) {
                         startActivity(new Intent(context, MainActivity.class));

@@ -27,18 +27,28 @@ import java.util.Arrays;
 
 import se.arctosoft.vault.MainActivity;
 import se.arctosoft.vault.utils.FileStuff;
+import se.arctosoft.vault.utils.Settings;
 
 public class Password {
     private static final String TAG = "Password";
 
     private static Password instance;
     private char[] password;
+    private DirHash dirHash;
 
     private Password() {
     }
 
     public void setPassword(char[] password) {
         this.password = password;
+    }
+
+    public void setDirHash(DirHash dirHash) {
+        this.dirHash = dirHash;
+    }
+
+    public DirHash getDirHash() {
+        return dirHash;
     }
 
     public char[] getPassword() {
@@ -52,17 +62,25 @@ public class Password {
         return instance;
     }
 
-    public void clearPassword() {
+    public void clear() {
         if (password != null) {
             Arrays.fill(password, (char) 0);
             password = null;
         }
+        if (dirHash != null) {
+            dirHash.clear();
+            dirHash = null;
+        }
     }
 
-    public static void lock(Context context) {
-        Log.d(TAG, "lock");
+    public static void lock(Context context, boolean deleteDirHash) {
+        Log.e(TAG, "lock" + ", " + context + ", " + deleteDirHash);
         Password p = Password.getInstance();
-        p.clearPassword();
+        if (deleteDirHash && context != null && p.dirHash != null) {
+            Settings settings = Settings.getInstance(context);
+            settings.deleteDirHashEntry(p.dirHash.salt(), p.dirHash.hash());
+        }
+        p.clear();
         if (context != null) {
             FileStuff.deleteCache(context);
             Glide.get(context).clearMemory();
